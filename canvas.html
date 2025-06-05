@@ -40,7 +40,7 @@
   <div id="textInputsContainer"></div>
   <button onclick="addTextField()">➕ Tambah Teks</button>
 
-  <!-- Hanya bagian SCRIPT-nya yang perlu diganti -->
+<!-- Hanya bagian SCRIPT-nya yang perlu diganti -->
 <script>
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -52,6 +52,44 @@
   let texts = [];
   let draggingTextIndex = null;
 
+  document.getElementById('photoInput').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          userImage = img;
+          imagePos = { x: 0, y: 0 };
+          imageScale = 1;
+          document.getElementById('scaleSlider').value = 1;
+          renderCanvas();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('templateInput').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        templateImage = new Image();
+        templateImage.onload = () => {
+          canvas.width = templateImage.width;
+          canvas.height = templateImage.height;
+          renderCanvas();
+        };
+        templateImage.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('scaleSlider').addEventListener('input', e => {
+      imageScale = parseFloat(e.target.value);
+      renderCanvas();
+    });
   // --- FUNGSI RENDER UTAMA ---
   function renderCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -148,7 +186,51 @@
   }
 
   // SISANYA: tetapkan semua event seperti upload gambar, scale, addTextField dll. tetap sama.
+  function moveImage(dx, dy) {
+      imagePos.x += dx;
+      imagePos.y += dy;
+      renderCanvas();
+    }
+
+    function resetCanvas() {
+      userImage = null;
+      imagePos = { x: 0, y: 0 };
+      imageScale = 1;
+      texts = [];
+      templateImage.src = "";
+      document.getElementById("photoInput").value = "";
+      document.getElementById("scaleSlider").value = 1;
+      document.getElementById("textInputsContainer").innerHTML = "";
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < 3; i++) addTextField();
+    }
+
+    function downloadImage() {
+      const link = document.createElement('a');
+      link.download = 'twibbon.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    }
+
+    function addTextField() {
+      const index = texts.length;
+      texts.push({ text: '', x: 100, y: 100 + index * 30, size: 24, color: '#000000' });
+
+      const div = document.createElement('div');
+      div.className = 'text-controls';
+      div.innerHTML = `
+        <input type="text" placeholder="Teks" oninput="texts[${index}].text = this.value; renderCanvas()">
+        <input type="number" placeholder="Ukuran" value="24" oninput="texts[${index}].size = parseInt(this.value); renderCanvas()">
+        <input type="color" value="#000000" oninput="texts[${index}].color = this.value; renderCanvas()">
+        <input type="number" placeholder="X" value="100" oninput="texts[${index}].x = parseInt(this.value); renderCanvas()">
+        <input type="number" placeholder="Y" value="${100 + index * 30}" oninput="texts[${index}].y = parseInt(this.value); renderCanvas()">
+      `;
+      document.getElementById('textInputsContainer').appendChild(div);
+    }
+
+    for (let i = 0; i < 3; i++) addTextField();
 </script>
+
 
 </body>
 </html>
