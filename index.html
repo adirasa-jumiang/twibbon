@@ -281,6 +281,19 @@ function moveTouch(e) {
     renderCanvas();
   }
 }
+</script>
+  <script>
+  function resizeCanvas() {
+  const canvas = document.getElementById("previewCanvas");
+  const containerWidth = canvas.offsetWidth;
+  canvas.width = containerWidth;
+  canvas.height = containerWidth; // atau tinggi lain kalau bukan bentuk kotak
+}
+
+// Resize saat halaman dimuat
+window.addEventListener("load", resizeCanvas);
+// Resize ulang jika layar diputar
+window.addEventListener("resize", resizeCanvas);
 
 </script>
 </body>
