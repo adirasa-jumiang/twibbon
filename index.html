@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Twibbon Customizer</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+    canvas { border: 1px solid #ccc; margin-top: 10px; background-color: transparent; }
+    .template-list img {
+      width: 100px; margin: 5px; cursor: pointer; border: 2px solid transparent;
+    }
+    .template-list img.selected {
+      border-color: blue;
+    }
+    .text-controls button {
+      margin: 2px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Twibbon Customizer</h2>
+
+  <input type="file" id="photoInput" accept="image/*"><br>
+  Ukuran Foto: <input type="range" id="scaleSlider" min="0.2" max="2" step="0.01" value="1"><br><br>
+
+  <label>Warna Background Canvas:</label>
+  <input type="color" id="bgColorPicker" value="#ffffff">
+  <label><input type="checkbox" id="bgTransparent"> Transparan</label>
+  <br><br>
+
+  <div class="template-list">
+    <img src="1.png" id="tw1" onclick="selectTemplate('1.png')" alt="Twibbon 1">
+    <img src="2.png" id="tw2" onclick="selectTemplate('2.png')" alt="Twibbon 2">
+    <img src="3.png" id="tw3" onclick="selectTemplate('3.png')" alt="Twibbon 3">
+    <img src="4.png" id="tw4" onclick="selectTemplate('4.png')" alt="Twibbon 4">
+    <img src="5.png" id="tw5" onclick="selectTemplate('5.png')" alt="Twibbon 5">
+  </div><br>
+
+  <div class="text-inputs" id="textInputsContainer">
+    <!-- Teks akan ditambahkan dinamis dengan JS -->
+  </div>
+  <button onclick="addTextField()">➕ Tambah Teks</button><br><br>
+
+  <canvas id="previewCanvas" width="600" height="600"></canvas><br>
+  <button onclick="downloadImage()">Download Hasil</button>
+  <button onclick="resetCanvas()">🔁 Reset/Hapus Semua</button>
+
+<script>
+const canvas = document.getElementById("previewCanvas");
+const ctx = canvas.getContext("2d");
+let userImage = null;
+let imageScale = 1;
+let imagePos = { x: 0, y: 0 };
+let texts = [];
+let templateImage = new Image();
+templateImage.onload = renderCanvas;
+
+function selectTemplate(src) {
+  templateImage.src = src;
+  renderCanvas();
+}
+
+document.getElementById("photoInput").addEventListener("change", function(e) {
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const img = new Image();
+    img.onload = function() {
+      userImage = img;
+      imagePos = { x: 0, y: 0 };
+      renderCanvas();
+    }
+    img.src = evt.target.result;
+  }
+  reader.readAsDataURL(e.target.files[0]);
+});
+
+document.getElementById("scaleSlider").addEventListener("input", function(e) {
+  imageScale = parseFloat(e.target.value);
+  renderCanvas();
+});
+
+document.getElementById("bgColorPicker").addEventListener("input", renderCanvas);
+document.getElementById("bgTransparent").addEventListener("change", renderCanvas);
+
+canvas.addEventListener("mousedown", startDrag);
+let dragIndex = -1;
+let offset = {x: 0, y: 0};
+
+function startDrag(e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  texts.forEach((t, i) => {
+    ctx.font = `${t.bold ? 'bold ' : ''}${t.size}px ${t.font}`;
+    const width = ctx.measureText(t.text).width;
+    const height = t.size;
+    if (x >= t.x - width/2 && x <= t.x + width/2 && y >= t.y - height && y <= t.y) {
+      dragIndex = i;
+      offset.x = x - t.x;
+      offset.y = y - t.y;
+    }
+  });
+
+  if (userImage) {
+    const imgW = userImage.width * imageScale;
+    const imgH = userImage.height * imageScale;
+    if (x >= imagePos.x && x <= imagePos.x + imgW &&
+        y >= imagePos.y && y <= imagePos.y + imgH) {
+      dragIndex = 'image';
+      offset.x = x - imagePos.x;
+      offset.y = y - imagePos.y;
+    }
+  }
+}
+canvas.addEventListener("mousemove", function(e) {
+  const rect = canvas.getBoundingClientRect();
+  if (dragIndex === 'image') {
+    imagePos.x = e.clientX - rect.left - offset.x;
+    imagePos.y = e.clientY - rect.top - offset.y;
+    renderCanvas();
+  } else if (dragIndex >= 0) {
+    texts[dragIndex].x = e.clientX - rect.left - offset.x;
+    texts[dragIndex].y = e.clientY - rect.top - offset.y;
+    renderCanvas();
+  }
+});
+canvas.addEventListener("mouseup", () => dragIndex = -1);
+
+canvas.addEventListener("touchstart", startTouch, { passive: false });
+canvas.addEventListener("touchmove", moveTouch, { passive: false });
+canvas.addEventListener("touchend", () => dragIndex = -1);
+
+function addTextField() {
+  const index = texts.length + 1;
+  texts.push({ text: '', x: canvas.width / 2, y: 100 + index * 50, color: '#ffffff', size: 30, font: 'Arial', bold: false, shadow: false });
+
+  const container = document.createElement("div");
+  container.innerHTML = `
+    <label>Teks ${index}:</label><br>
+    <textarea id="text${index}" rows="2" cols="30" placeholder="Teks"></textarea><br>
+    Warna: <input type="color" id="color${index}" value="#ffffff">
+    Ukuran: <input type="number" id="size${index}" value="30" min="10" max="100">
+    Font: <select id="font${index}">
+      <option>Arial</option><option>Verdana</option><option>Georgia</option>
+      <option>Comic Sans MS</option><option>Impact</option>
+    </select>
+    <label><input type="checkbox" id="bold${index}"> Bold</label>
+    <label><input type="checkbox" id="shadow${index}"> Shadow</label>
+    <label><input type="checkbox" id="underline${index}"> Underline</label>
+    <div class="text-controls">
+      <button onclick="setTextY(${index - 1}, 'top')">🔼 Atas</button>
+      <button onclick="setTextY(${index - 1}, 'middle')">⬆️ Tengah</button>
+      <button onclick="setTextY(${index - 1}, 'bottom')">🔽 Bawah</button>
+    </div><br><br>
+  `;
+  document.getElementById("textInputsContainer").appendChild(container);
+
+  ['text', 'color', 'size', 'font', 'bold', 'shadow', 'underline'].forEach(key => {
+    document.getElementById(`${key}${index}`).addEventListener("input", () => {
+      const t = texts[index - 1];
+      t.text = document.getElementById(`text${index}`).value;
+      t.color = document.getElementById(`color${index}`).value;
+      t.size = parseInt(document.getElementById(`size${index}`).value);
+      t.font = document.getElementById(`font${index}`).value;
+      t.bold = document.getElementById(`bold${index}`).checked;
+      t.shadow = document.getElementById(`shadow${index}`).checked;
+      t.underline = document.getElementById(`underline${index}`).checked;
+      renderCanvas();
+    });
+  });
+}
+
+for (let i = 0; i < 3; i++) addTextField();
+
+function renderCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!document.getElementById("bgTransparent").checked) {
+    ctx.fillStyle = document.getElementById("bgColorPicker").value;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  if (userImage) {
+    const imgW = userImage.width * imageScale;
+    const imgH = userImage.height * imageScale;
+    ctx.drawImage(userImage, imagePos.x, imagePos.y, imgW, imgH);
+  }
+
+  if (templateImage.src) ctx.drawImage(templateImage, 0, 0, canvas.width, canvas.height);
+
+  texts.forEach(t => {
+    ctx.font = `${t.bold ? 'bold ' : ''}${t.size}px ${t.font}`;
+    ctx.fillStyle = t.color;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    if (t.shadow) {
+      ctx.shadowColor = "black";
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      ctx.shadowBlur = 2;
+    } else {
+      ctx.shadowColor = "transparent";
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.shadowBlur = 0;
+    }
+    const lines = t.text.split("\n");
+    lines.forEach((line, i) => {
+      ctx.fillText(line, t.x, t.y + i * t.size);
+      if (t.underline) {
+        const textWidth = ctx.measureText(line).width;
+        ctx.beginPath();
+        ctx.moveTo(t.x - textWidth / 2, t.y + i * t.size + 5);
+        ctx.lineTo(t.x + textWidth / 2, t.y + i * t.size + 5);
+        ctx.strokeStyle = t.color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    });
+  });
+}
+
+function setTextY(index, pos) {
+  const padding = 50;
+  if (pos === 'top') texts[index].y = padding;
+  else if (pos === 'middle') texts[index].y = canvas.height / 2;
+  else if (pos === 'bottom') texts[index].y = canvas.height - padding;
+  renderCanvas();
+}
+
+function resetCanvas() {
+  userImage = null;
+  imagePos = { x: 0, y: 0 };
+  imageScale = 1;
+  texts = [];
+  templateImage.src = "";
+  document.getElementById("photoInput").value = "";
+  document.getElementById("scaleSlider").value = 1;
+  document.getElementById("textInputsContainer").innerHTML = "";
+  for (let i = 0; i < 3; i++) addTextField();
+  renderCanvas();
+}
+
+function downloadImage() {
+  const link = document.createElement('a');
+  link.download = 'twibbon.png';
+  link.href = canvas.toDataURL();
+  link.click();
+}
+
+function startTouch(e) {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches[0];
+  const x = touch.clientX - rect.left;
+  const y = touch.clientY - rect.top;
+  startDrag({ clientX: x + rect.left, clientY: y + rect.top });
+}
+
+function moveTouch(e) {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches[0];
+  const x = touch.clientX - rect.left;
+  const y = touch.clientY - rect.top;
+
+  if (dragIndex === 'image') {
+    imagePos.x = x - offset.x;
+    imagePos.y = y - offset.y;
+    renderCanvas();
+  } else if (dragIndex >= 0) {
+    texts[dragIndex].x = x - offset.x;
+    texts[dragIndex].y = y - offset.y;
+    renderCanvas();
+  }
+}
+
+</script>
+</body>
+</html>
