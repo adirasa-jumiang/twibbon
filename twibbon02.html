@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Twibbon Customizer</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; background: #f0f0f0; }
+    canvas { border: 1px solid #ccc; margin-top: 10px; }
+    .controls { margin-top: 15px; }
+    .text-controls { display: flex; justify-content: center; gap: 10px; margin-top: 5px; flex-wrap: wrap; }
+    .text-controls input, .text-controls select { padding: 4px; }
+  </style>
+</head>
+<body>
+
+  <h2>Twibbon Customizer</h2>
+
+  <div>
+    <label>Upload Foto Kamu: <input type="file" id="photoInput" accept="image/*"></label>
+  </div>
+  <div>
+    <label>Upload Template Twibbon: <input type="file" id="templateInput" accept="image/*"></label>
+  </div>
+  <div>
+    <label>Perbesar/Kecilkan Foto: <input type="range" id="scaleSlider" min="0.2" max="2" step="0.01" value="1"></label>
+  </div>
+
+  <canvas id="canvas" width="800" height="800"></canvas>
+
+  <div class="controls">
+    <button onclick="moveImage(0, -10)">⬆️</button>
+    <button onclick="moveImage(-10, 0)">⬅️</button>
+    <button onclick="moveImage(10, 0)">➡️</button>
+    <button onclick="moveImage(0, 10)">⬇️</button>
+    <button onclick="resetCanvas()">🔄 Reset</button>
+    <button onclick="downloadImage()">💾 Download</button>
+  </div>
+
+  <h3>Teks Custom</h3>
+  <div id="textInputsContainer"></div>
+  <button onclick="addTextField()">➕ Tambah Teks</button>
+
+<!-- Hanya bagian SCRIPT-nya yang perlu diganti -->
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  let userImage = null;
+  let templateImage = new Image();
+  let imagePos = { x: 0, y: 0 };
+  let imageScale = 1;
+  let texts = [];
+  let draggingTextIndex = null;
+
+  document.getElementById('photoInput').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          userImage = img;
+          imagePos = { x: 0, y: 0 };
+          imageScale = 1;
+          document.getElementById('scaleSlider').value = 1;
+          renderCanvas();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('templateInput').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        templateImage = new Image();
+        templateImage.onload = () => {
+          canvas.width = templateImage.width;
+          canvas.height = templateImage.height;
+          renderCanvas();
+        };
+        templateImage.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('scaleSlider').addEventListener('input', e => {
+      imageScale = parseFloat(e.target.value);
+      renderCanvas();
+    });
+  // --- FUNGSI RENDER UTAMA ---
+  function renderCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (userImage) {
+      const iw = userImage.width * imageScale;
+      const ih = userImage.height * imageScale;
+      const x = (canvas.width - iw) / 2 + imagePos.x;
+      const y = (canvas.height - ih) / 2 + imagePos.y;
+      ctx.drawImage(userImage, x, y, iw, ih);
+    }
+    if (templateImage.src) ctx.drawImage(templateImage, 0, 0, canvas.width, canvas.height);
+
+    texts.forEach((txt, i) => {
+      ctx.font = `${txt.size}px sans-serif`;
+      ctx.fillStyle = txt.color;
+      ctx.fillText(txt.text, txt.x, txt.y);
+      if (i === draggingTextIndex) {
+        const width = ctx.measureText(txt.text).width;
+        ctx.strokeStyle = 'red';
+        ctx.strokeRect(txt.x - 2, txt.y - txt.size, width + 4, txt.size + 4);
+      }
+    });
+  }
+
+  // --- DRAG TEKS DENGAN MOUSE / TOUCH ---
+  canvas.addEventListener('mousedown', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    draggingTextIndex = getTextAtPosition(x, y);
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    if (draggingTextIndex !== null) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left, y = e.clientY - rect.top;
+      const t = texts[draggingTextIndex];
+      t.x = x;
+      t.y = y;
+      updateTextInputs();
+      renderCanvas();
+    }
+  });
+
+  canvas.addEventListener('mouseup', () => {
+    draggingTextIndex = null;
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    draggingTextIndex = null;
+  });
+
+  canvas.addEventListener('touchstart', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.touches[0].clientX - rect.left, y = e.touches[0].clientY - rect.top;
+    draggingTextIndex = getTextAtPosition(x, y);
+  });
+
+  canvas.addEventListener('touchmove', e => {
+    if (draggingTextIndex !== null) {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const x = e.touches[0].clientX - rect.left, y = e.touches[0].clientY - rect.top;
+      const t = texts[draggingTextIndex];
+      t.x = x;
+      t.y = y;
+      updateTextInputs();
+      renderCanvas();
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', () => {
+    draggingTextIndex = null;
+  });
+
+  function getTextAtPosition(x, y) {
+    for (let i = texts.length - 1; i >= 0; i--) {
+      const txt = texts[i];
+      ctx.font = `${txt.size}px sans-serif`;
+      const width = ctx.measureText(txt.text).width;
+      const height = txt.size;
+      if (x >= txt.x && x <= txt.x + width && y >= txt.y - height && y <= txt.y) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  function updateTextInputs() {
+    const container = document.getElementById('textInputsContainer');
+    container.querySelectorAll('.text-controls').forEach((div, i) => {
+      div.querySelectorAll('input')[3].value = texts[i].x;
+      div.querySelectorAll('input')[4].value = texts[i].y;
+    });
+  }
+
+  // SISANYA: tetapkan semua event seperti upload gambar, scale, addTextField dll. tetap sama.
+  function moveImage(dx, dy) {
+      imagePos.x += dx;
+      imagePos.y += dy;
+      renderCanvas();
+    }
+
+    function resetCanvas() {
+      userImage = null;
+      imagePos = { x: 0, y: 0 };
+      imageScale = 1;
+      texts = [];
+      templateImage.src = "";
+      document.getElementById("photoInput").value = "";
+      document.getElementById("scaleSlider").value = 1;
+      document.getElementById("textInputsContainer").innerHTML = "";
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < 3; i++) addTextField();
+    }
+
+    function downloadImage() {
+      const link = document.createElement('a');
+      link.download = 'twibbon.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    }
+
+    function addTextField() {
+      const index = texts.length;
+      texts.push({ text: '', x: 100, y: 100 + index * 30, size: 24, color: '#000000' });
+
+      const div = document.createElement('div');
+      div.className = 'text-controls';
+      div.innerHTML = `
+        <input type="text" placeholder="Teks" oninput="texts[${index}].text = this.value; renderCanvas()">
+        <input type="number" placeholder="Ukuran" value="24" oninput="texts[${index}].size = parseInt(this.value); renderCanvas()">
+        <input type="color" value="#000000" oninput="texts[${index}].color = this.value; renderCanvas()">
+        <input type="number" placeholder="X" value="100" oninput="texts[${index}].x = parseInt(this.value); renderCanvas()">
+        <input type="number" placeholder="Y" value="${100 + index * 30}" oninput="texts[${index}].y = parseInt(this.value); renderCanvas()">
+      `;
+      document.getElementById('textInputsContainer').appendChild(div);
+    }
+
+    for (let i = 0; i < 3; i++) addTextField();
+</script>
+
+
+</body>
+</html>
