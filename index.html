@@ -15,6 +15,13 @@
     .text-controls button {
       margin: 2px;
     }
+    #previewCanvas {
+  width: 100%;
+  max-width: 500px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
   </style>
 </head>
 <body>
@@ -41,7 +48,7 @@
   </div>
   <button onclick="addTextField()">➕ Tambah Teks</button><br><br>
 
-  <canvas id="previewCanvas" width="100%" height="600"></canvas><br>
+  <canvas id="previewCanvas"></canvas><br><br>
   <button onclick="downloadImage()">Download Hasil</button>
   <button onclick="resetCanvas()">🔁 Reset/Hapus Semua</button>
 
